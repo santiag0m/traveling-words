@@ -6,3 +6,4 @@ datasets==2.14.4
 tiktoken==0.4.0
 wandb==0.15.8
 tqdm==4.66.1
+matplotlib==3.7.2
