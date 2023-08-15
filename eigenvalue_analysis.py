@@ -8,16 +8,7 @@ from matplotlib.axes._axes import Axes
 from nanoGPT.model import GPT
 
 from model_utils import load_model, get_attn_weights_from_block, split_weights_by_head
-
-
-def find_closest_to_square(area: int) -> tuple[int, int]:
-    square = area**0.5
-    rows = int(square)
-    while True:
-        if area % rows == 0:
-            cols = area // rows
-            return (rows, cols)
-        rows += 1
+from plot_utils import find_closest_to_square
 
 
 def plot_head_interactions(
