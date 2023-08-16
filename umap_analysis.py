@@ -18,6 +18,7 @@ def plot_umap_per_head(
     wv_heads: list[torch.Tensor],
     wo_heads: list[torch.Tensor],
     umap: UMAPWithLaplacianInit,
+    labels: list = [],
 ) -> tuple[tuple[plt.Figure, plt.Axes]]:
     n_head = len(wq_heads)
     assert n_head == len(wk_heads), "Number of heads do not match (Q vs. K)"
@@ -61,8 +62,14 @@ def plot_umap_per_head(
             )  # (Vocab x Dims) @ (Dims x Dims_h) @ (Dims_h x Dims)
             v = umap.transform(v.cpu().numpy())  # Vocab x 3
 
+            v = v - v.mean(axis=-1, keepdims=True)
+
             axs_qk[i].scatter(q[:, 0], q[:, 1], q[:, 2], c="red", label="query")
             axs_qk[i].scatter(k[:, 0], k[:, 1], k[:, 2], c="blue", label="key")
+
+            for j, label in enumerate(labels):
+                axs_qk[i].text(q[j, 0], q[j, 1], q[j, 2], label, color="red")
+                axs_qk[i].text(k[j, 0], k[j, 1], k[j, 2], label, color="blue")
 
             axs_vo[i].scatter(q[:, 0], q[:, 1], q[:, 2], c="red", label="query")
             axs_vo[i].quiver(
@@ -76,6 +83,9 @@ def plot_umap_per_head(
                 label="value",
                 normalize=True,
             )
+
+            for j, label in enumerate(labels):
+                axs_vo[i].text(q[j, 0], q[j, 1], q[j, 2], label, color="red")
 
             axs_qk[i].legend()
             axs_vo[i].legend()
@@ -96,7 +106,7 @@ def plot_umap_per_head(
 if __name__ == "__main__":
     plt.ion()
 
-    model = load_model(out_dir="nanoGPT/out-shakespeare-char-no-pe")
+    model, encode, decode = load_model(out_dir="nanoGPT/out-shakespeare-char-no-pe")
 
     e = model.transformer.wte.weight.detach()
 
@@ -120,4 +130,5 @@ if __name__ == "__main__":
         wv_heads=wq_heads,
         wo_heads=wq_heads,
         umap=umap,
+        labels=[decode([i])[0] for i in range(model.config.vocab_size)],
     )

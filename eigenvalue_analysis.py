@@ -89,7 +89,7 @@ def plot_eigenvalues(wq_heads: list[torch.Tensor], wk_heads: list[torch.Tensor])
 if __name__ == "__main__":
     plt.ion()
 
-    model = load_model(out_dir="nanoGPT/out-shakespeare-char-no-pe")
+    model, encode, decode = load_model(out_dir="nanoGPT/out-shakespeare-char-no-pe")
 
     e = model.transformer.wte.weight.detach()
 

@@ -1,11 +1,15 @@
 import os
+import pickle
+from typing import Callable
 
 import torch
 
 from nanoGPT.model import GPTConfig, GPT, Block
 
 
-def load_model(out_dir: str, init_from: str = "resume", seed: int = 1337) -> GPT:
+def load_model(
+    out_dir: str, init_from: str = "resume", seed: int = 1337
+) -> tuple[GPT, Callable, Callable]:
     device = "cuda"  # examples: 'cpu', 'cuda', 'cuda:0', 'cuda:1', etc.
 
     torch.manual_seed(seed)
@@ -26,13 +30,26 @@ def load_model(out_dir: str, init_from: str = "resume", seed: int = 1337) -> GPT
             if k.startswith(unwanted_prefix):
                 state_dict[k[len(unwanted_prefix) :]] = state_dict.pop(k)
         model.load_state_dict(state_dict)
+
+        meta_path = os.path.join(
+            "nanoGPT", "data", checkpoint["config"]["dataset"], "meta.pkl"
+        )
+        load_meta = os.path.exists(meta_path)
+        if load_meta:
+            print(f"Loading meta from {meta_path}...")
+            with open(meta_path, "rb") as f:
+                meta = pickle.load(f)
+            # TODO want to make this more general to arbitrary encoder/decoder schemes
+            stoi, itos = meta["stoi"], meta["itos"]
+            encode = lambda s: [stoi[c] for c in s]
+            decode = lambda l: "".join([itos[i] for i in l])
     elif init_from.startswith("gpt2"):
         # init from a given GPT-2 model
         model = GPT.from_pretrained(init_from, dict(dropout=0.0))
 
     model.eval()
     model.to(device)
-    return model
+    return model, encode, decode
 
 
 def get_attn_weights_from_block(
