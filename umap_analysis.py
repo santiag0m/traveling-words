@@ -13,6 +13,8 @@ from umap_utils import UMAPWithLaplacianInit
 
 def plot_umap_per_head(
     inputs: torch.Tensor,
+    ln_1: torch.nn.LayerNorm,
+    ln_2: torch.nn.LayerNorm,
     wq_heads: list[torch.Tensor],
     wk_heads: list[torch.Tensor],
     wv_heads: list[torch.Tensor],
@@ -38,12 +40,16 @@ def plot_umap_per_head(
     axs_vo = axs_vo.ravel()
 
     with torch.no_grad():
-        e_norm = ln_1(inputs)  # Vocab x Dims
-        e_3d_norm = umap.transform(e_norm.cpu().numpy())  # Vocab x 3
-        q = e_3d_norm  # Vocab x 3
+        x_norm = ln_1(inputs)  # Vocab x Dims
 
-        min_z = min(q[:, 2])
-        max_z = max(q[:, 2])
+        x_3d = umap.transform(inputs.cpu().numpy())
+        x_norm_3d = umap.transform(x_norm.cpu().numpy())  # Vocab x 3
+
+        min_qk_z = min(x_norm_3d[:, 2])
+        max_qk_z = max(x_norm_3d[:, 2])
+
+        min_vo_z = min(x_3d[:, 2])
+        max_vo_z = min(x_3d[:, 2])
 
         for i in range(model.config.n_head):
             wq = wq_heads[i]
@@ -51,41 +57,87 @@ def plot_umap_per_head(
             wv = wv_heads[i]
             wo = wo_heads[i]
 
-            k = (
-                wq @ wk.T @ e_norm.T
+            qk = (
+                wq @ wk.T @ x_norm.T
             )  # (Dims x Dims_h) @ (Dims_h x Dims) @ (Dims x Vocab)
-            k = k.T  # Vocab x Dims
-            k = umap.transform(k.cpu().numpy())  # Vocab x 3
+            qk = qk.T  # Vocab x Dims
+            qk = umap.transform(qk.cpu().numpy())  # Vocab x 3
 
-            v = e_norm @ (
+            gradient = x_norm @ (
                 wv @ wo.T
             )  # (Vocab x Dims) @ (Dims x Dims_h) @ (Dims_h x Dims)
-            v = umap.transform(v.cpu().numpy())  # Vocab x 3
 
-            v = v - v.mean(axis=-1, keepdims=True)
+            # Add & Norm
+            y = inputs + gradient
+            y_norm = ln_2(y)
 
-            axs_qk[i].scatter(q[:, 0], q[:, 1], q[:, 2], c="red", label="query")
-            axs_qk[i].scatter(k[:, 0], k[:, 1], k[:, 2], c="blue", label="key")
+            y_norm_3d = umap.transform(y_norm.cpu().numpy())
+            delta = (
+                y_norm_3d - x_3d
+            )  # compare to un-normalized inputs (bc weight tying at the end)
 
-            for j, label in enumerate(labels):
-                axs_qk[i].text(q[j, 0], q[j, 1], q[j, 2], label, color="red")
-                axs_qk[i].text(k[j, 0], k[j, 1], k[j, 2], label, color="blue")
-
-            axs_vo[i].scatter(q[:, 0], q[:, 1], q[:, 2], c="red", label="query")
-            axs_vo[i].quiver(
-                q[:, 0],
-                q[:, 1],
-                q[:, 2],
-                v[:, 0],
-                v[:, 1],
-                v[:, 2],
-                color="green",
-                label="value",
-                normalize=True,
+            axs_qk[i].scatter(
+                x_norm_3d[:, 0],
+                x_norm_3d[:, 1],
+                x_norm_3d[:, 2],
+                c="red",
+                label="normalized_inputs",
+            )
+            axs_qk[i].scatter(
+                qk[:, 0], qk[:, 1], qk[:, 2], c="blue", label="query_key_transform"
             )
 
             for j, label in enumerate(labels):
-                axs_vo[i].text(q[j, 0], q[j, 1], q[j, 2], label, color="red")
+                axs_qk[i].text(
+                    x_norm_3d[j, 0],
+                    x_norm_3d[j, 1],
+                    x_norm_3d[j, 2],
+                    label,
+                    color="red",
+                )
+                axs_qk[i].text(qk[j, 0], qk[j, 1], qk[j, 2], label, color="blue")
+
+            axs_vo[i].scatter(
+                x_3d[:, 0],
+                x_3d[:, 1],
+                x_3d[:, 2],
+                c="red",
+                label="original_inputs",
+            )
+            axs_vo[i].quiver(
+                x_3d[:, 0],
+                x_3d[:, 1],
+                x_3d[:, 2],
+                delta[:, 0],
+                delta[:, 1],
+                delta[:, 2],
+                color="green",
+                label="normalized_gradient",
+                alpha=0.3,
+            )
+            axs_vo[i].scatter(
+                y_norm_3d[:, 0],
+                y_norm_3d[:, 1],
+                y_norm_3d[:, 2],
+                c="purple",
+                label="normalized_outputs",
+            )
+
+            for j, label in enumerate(labels):
+                axs_vo[i].text(
+                    x_3d[j, 0],
+                    x_3d[j, 1],
+                    x_3d[j, 2],
+                    label,
+                    color="red",
+                )
+                axs_vo[i].text(
+                    y_norm_3d[j, 0],
+                    y_norm_3d[j, 1],
+                    y_norm_3d[j, 2],
+                    label,
+                    color="purple",
+                )
 
             axs_qk[i].legend()
             axs_vo[i].legend()
@@ -93,12 +145,15 @@ def plot_umap_per_head(
             axs_qk[i].set_title(f"Head {i}")
             axs_vo[i].set_title(f"Head {i}")
 
-            min_z = min(min_z, min(k[:, 2]))
-            max_z = max(max_z, max(k[:, 2]))
+            min_qk_z = min(min_qk_z, min(qk[:, 2]))
+            max_qk_z = max(max_qk_z, max(qk[:, 2]))
+
+            min_vo_z = min(min_vo_z, min(y_norm_3d[:, 2]))
+            max_vo_z = max(max_vo_z, max(y_norm_3d[:, 2]))
 
         for i in range(model.config.n_head):
-            axs_qk[i].set_zlim(min_z, max_z)
-            axs_vo[i].set_zlim(min_z, max_z)
+            axs_qk[i].set_zlim(min_qk_z, max_qk_z)
+            axs_vo[i].set_zlim(min_qk_z, max_qk_z)
 
         return (f_qk, axs_qk), (f_vo, axs_vo)
 
@@ -120,11 +175,10 @@ if __name__ == "__main__":
         wq, wk, wv, wo, n_heads=model.config.n_head
     )
 
-    with torch.no_grad():
-        e_norm = ln_1(e)
-
     (f_qk, axs_qk), (f_vo, axs_vo) = plot_umap_per_head(
-        inputs=e_norm,
+        inputs=e,
+        ln_1=ln_1,
+        ln_2=ln_2,
         wq_heads=wq_heads,
         wk_heads=wq_heads,
         wv_heads=wq_heads,
