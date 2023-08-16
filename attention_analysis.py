@@ -161,7 +161,7 @@ def plot_umap_per_head(
 if __name__ == "__main__":
     plt.ion()
 
-    model, encode, decode = load_model(out_dir="nanoGPT/out-shakespeare-char-no-pe")
+    model, encode, decode = load_model(out_dir="nanoGPT/out-shakespeare-char")
 
     e = model.transformer.wte.weight.detach()
 
