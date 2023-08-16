@@ -2,7 +2,7 @@ import os
 
 import torch
 
-from nanoGPT.model import GPTConfig, GPT
+from nanoGPT.model import GPTConfig, GPT, Block
 
 
 def load_model(out_dir: str, init_from: str = "resume", seed: int = 1337) -> GPT:
@@ -38,12 +38,22 @@ def load_model(out_dir: str, init_from: str = "resume", seed: int = 1337) -> GPT
 def get_attn_weights_from_block(
     model: GPT, block_idx: int
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    block = model.transformer["h"][block_idx]
+    block: Block = model.transformer["h"][block_idx]
     weights = block.attn.c_attn.weight.detach()
 
     # Assume y = x @ W, instead of nn.linear
     wq, wk, wv = weights.T.split(model.config.n_embd, dim=1)
-    return wq, wk, wv
+
+    # Output matrix should NOT be transposed
+    wo = block.attn.c_proj.weight
+    return wq, wk, wv, wo
+
+
+def get_ln_from_block(
+    model: GPT, block_idx: int
+) -> tuple[torch.nn.LayerNorm, torch.nn.LayerNorm]:
+    block: Block = model.transformer["h"][block_idx]
+    return block.ln_1, block.ln_2
 
 
 def split_weights_by_head(*args, n_heads: int) -> list[list[torch.Tensor]]:
