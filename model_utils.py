@@ -1,14 +1,15 @@
 import os
 import pickle
-from typing import Callable
+from typing import Callable, Optional
 
 import torch
+import tiktoken
 
 from nanoGPT.model import GPTConfig, GPT, Block
 
 
 def load_model(
-    out_dir: str, init_from: str = "resume", seed: int = 1337
+    out_dir: Optional[str] = None, init_from: str = "resume", seed: int = 1337
 ) -> tuple[GPT, Callable, Callable]:
     device = "cuda"  # examples: 'cpu', 'cuda', 'cuda:0', 'cuda:1', etc.
 
@@ -19,6 +20,9 @@ def load_model(
 
     # model
     if init_from == "resume":
+        if out_dir is None:
+            raise ValueError("No 'out_dir' to resume from was provided")
+
         # init from a model saved in a specific directory
         ckpt_path = os.path.join(out_dir, "ckpt.pt")
         checkpoint = torch.load(ckpt_path, map_location=device)
@@ -43,9 +47,16 @@ def load_model(
             stoi, itos = meta["stoi"], meta["itos"]
             encode = lambda s: [stoi[c] for c in s]
             decode = lambda l: "".join([itos[i] for i in l])
+        else:
+            enc = tiktoken.get_encoding("gpt2")
+            encode = lambda s: enc.encode(s, allowed_special={"<|endoftext|>"})
+            decode = lambda l: enc.decode(l)
     elif init_from.startswith("gpt2"):
         # init from a given GPT-2 model
         model = GPT.from_pretrained(init_from, dict(dropout=0.0))
+        enc = tiktoken.get_encoding("gpt2")
+        encode = lambda s: enc.encode(s, allowed_special={"<|endoftext|>"})
+        decode = lambda l: enc.decode(l)
 
     model.eval()
     model.to(device)

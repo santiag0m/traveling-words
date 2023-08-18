@@ -1,3 +1,4 @@
+from math import ceil
 from typing import Union
 
 import numpy as np
@@ -9,12 +10,12 @@ from matplotlib.axes._axes import Axes
 
 def find_closest_to_square(area: int) -> tuple[int, int]:
     square = area**0.5
-    rows = int(square)
+    cols = ceil(square)
     while True:
-        if area % rows == 0:
-            cols = area // rows
+        if area % cols == 0:
+            rows = area // cols
             return (rows, cols)
-        rows += 1
+        cols += 1
 
 
 def plt_subplots_3d(
