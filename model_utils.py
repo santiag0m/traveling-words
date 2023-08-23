@@ -9,7 +9,7 @@ from nanoGPT.model import GPTConfig, GPT, Block
 
 
 def load_model(
-    out_dir: Optional[str] = None, init_from: str = "resume", seed: int = 1337
+    init_from: str = "gpt2", out_dir: Optional[str] = None, seed: int = 1337
 ) -> tuple[GPT, Callable, Callable]:
     device = "cuda"  # examples: 'cpu', 'cuda', 'cuda:0', 'cuda:1', etc.
 
