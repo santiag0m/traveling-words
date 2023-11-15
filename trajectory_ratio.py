@@ -83,7 +83,7 @@ def plot_lines(x: torch.Tensor):
 
     f, ax = plt.subplots(figsize=(12, 8))
     for i in range(num_layers):
-        ax.plot(x[i], color=colors[i], label=f"Layer {i+1}")
+        ax.plot(smooth_lines(x[i]), color=colors[i], label=f"Layer {i+1}")
 
     ax.set_xlabel("Sequence Position (S)")
     ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
@@ -153,7 +153,6 @@ if __name__ == "__main__":
     plt.ion()
 
     f, ax = plot_lines(mean_distance)
-    ax.set_title(r"Log Prob ratio $w_{t+1}/w_{t}$")
-    ax.set_ylabel(r"$log(p(w_{t+1})/p(w_{t}))$")
+    ax.set_title(r"$log(p(w_{t+1})/p(w_{t}))$")
     ax.grid()
     f.tight_layout()
