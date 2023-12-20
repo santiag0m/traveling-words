@@ -1,7 +1,7 @@
 # python 3.10
 torch==2.0.1
 numpy==1.24.4
-transformers==4.31.0
+transformers==4.36.0
 datasets==2.14.4
 tiktoken==0.4.0
 wandb==0.15.8
